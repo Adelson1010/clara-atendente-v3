@@ -1,32 +1,39 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request
 import requests
 
 app = Flask(__name__)
 
-@app.route("/", methods=["POST"])
-def receber_mensagem():
+@app.route('/', methods=['GET'])
+def home():
+    return 'Clara está online!'
+
+@app.route('/', methods=['POST'])
+def atender():
     data = request.get_json()
-    if data and "message" in data:
-        mensagem = data["message"].get("body", "").lower()
-        numero = data["message"]["from"]
-        
-        if "oi" in mensagem:
-            responder(numero, "Oi! Aqui é a Clara. Como posso ajudar?")
-        elif "horário" in mensagem:
-            responder(numero, "Nosso horário de atendimento é das 8h às 18h.")
-        else:
-            responder(numero, "Desculpe, não entendi. Pode repetir?")
-    
-    return jsonify({"status": "mensagem recebida"})
 
-def responder(telefone, texto):
-    url = "https://api.z-api.io/instances/3E205CFA4533E06D42D3C/token/23517734C6D44D8122B05/send-text"
-    payload = {
-        "phone": telefone,
-        "message": texto
+    if not data or 'message' not in data:
+        return {'status': 'mensagem vazia'}, 400
+
+    mensagem = data['message']['text']
+    numero = data['message']['from']
+
+    if mensagem.strip().lower() == 'oi':
+        texto_resposta = 'Olá! Eu sou a Clara, assistente virtual. Como posso ajudar?'
+    else:
+        texto_resposta = 'Me desculpe, ainda estou aprendendo. Por enquanto, respondo apenas "oi".'
+
+    resposta = {
+        "phone": numero,
+        "message": texto_resposta
     }
-    requests.post(url, json=payload)
 
-@app.route("/", methods=["GET"])
-def status():
-    return "Clara está online!"
+    # Envia a resposta usando a API da Z-API
+    requests.post(
+        'https://api.z-api.io/instances/3E205CFA4533E06D42D3C/token/23517734C6D44D8122B05/send-text',
+        json=resposta
+    )
+
+    return {'status': 'mensagem enviada'}, 200
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=False)
