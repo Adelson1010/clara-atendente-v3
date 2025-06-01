@@ -1,39 +1,32 @@
-from flask import Flask, request
+from flask import Flask, request, jsonify
 import requests
 
 app = Flask(__name__)
 
-# Substitua abaixo com os dados da sua instância Z-API
-ID_INSTANCIA = '3E205CFA4533E06D42D3C'
-TOKEN = '23517734C6D44D8122B05'
-
 @app.route("/", methods=["POST"])
 def receber_mensagem():
-    dados = request.json
+    data = request.get_json()
+    if data and "message" in data:
+        mensagem = data["message"].get("body", "").lower()
+        numero = data["message"]["from"]
+        
+        if "oi" in mensagem:
+            responder(numero, "Oi! Aqui é a Clara. Como posso ajudar?")
+        elif "horário" in mensagem:
+            responder(numero, "Nosso horário de atendimento é das 8h às 18h.")
+        else:
+            responder(numero, "Desculpe, não entendi. Pode repetir?")
+    
+    return jsonify({"status": "mensagem recebida"})
 
-    if not dados:
-        return "Sem dados", 400
-
-    mensagem = dados.get("message", {}).get("text", "")
-    numero = dados.get("message", {}).get("from", "")
-
-    if mensagem and numero:
-        resposta = f"Olá! Você enviou: {mensagem}"
-
-        url = f"https://api.z-api.io/instances/{ID_INSTANCIA}/token/{TOKEN}/send-messages"
-        payload = {
-            "phone": numero,
-            "message": resposta
-        }
-
-        headers = {"Content-Type": "application/json"}
-        requests.post(url, json=payload, headers=headers)
-
-    return "OK", 200
+def responder(telefone, texto):
+    url = "https://api.z-api.io/instances/3E205CFA4533E06D42D3C/token/23517734C6D44D8122B05/send-text"
+    payload = {
+        "phone": telefone,
+        "message": texto
+    }
+    requests.post(url, json=payload)
 
 @app.route("/", methods=["GET"])
-def home():
+def status():
     return "Clara está online!"
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
