@@ -1,46 +1,45 @@
 from flask import Flask, request
-import requests
-import os
 import openai
+import os
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app)
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
-ZAPI_TOKEN = "23517734C6D44D8122B05660"
-ZAPI_INSTANCE = "3E205CFA4533E06D42D3C6E882E8CF29"
-ZAPI_URL = f"https://api.z-api.io/instances/{ZAPI_INSTANCE}/token/{ZAPI_TOKEN}/send-messages"
-
 @app.route("/", methods=["POST"])
 def responder():
-    data = request.get_json()
+    data = request.json
 
-    if data.get("type") == "message":
-        mensagem = data["message"]["text"]
+    # Verifica se é uma mensagem válida
+    if data.get("type") == "message" and "text" in data.get("message", {}):
         telefone = data["phone"]
+        mensagem = data["message"]["text"]
 
-        print(f"Mensagem recebida de {telefone}: {mensagem}")
+        resposta = gerar_resposta(mensagem)
 
-        resposta = openai.ChatCompletion.create(
-            model="gpt-3.5-turbo",
-            messages=[
-                {"role": "system", "content": "Você é Clara, uma atendente virtual simpática da clínica CentralPsi."},
-                {"role": "user", "content": mensagem}
-            ]
-        )
-
-        texto_resposta = resposta["choices"][0]["message"]["content"]
-
-        payload = {
-            "phone": telefone,
-            "message": texto_resposta
+        return {
+            "send": [{
+                "phone": telefone,
+                "message": resposta
+            }]
         }
 
-        headers = {"Content-Type": "application/json"}
-        requests.post(ZAPI_URL, json=payload, headers=headers)
+    return "ok"
 
-    return "OK", 200
+def gerar_resposta(mensagem):
+    prompt = f"Você é uma atendente virtual chamada Clara. Seja educada e simpática. Responda a seguinte mensagem:\nUsuário: {mensagem}\nClara:"
+    
+    resposta = openai.ChatCompletion.create(
+        model="gpt-3.5-turbo",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.7,
+        max_tokens=100
+    )
 
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(debug=False, host="0.0.0.0", port=port)
+    return resposta.choices[0].message["content"].strip()
+
+@app.route("/", methods=["GET"])
+def status():
+    return "Clara está funcionando! 😊"
