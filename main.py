@@ -6,33 +6,44 @@ import os
 app = Flask(__name__)
 CORS(app)
 
-openai.api_key = os.environ.get("OPENAI_API_KEY")
+# Usa a variável de ambiente com a chave secreta da OpenAI
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 @app.route("/", methods=["GET"])
-def index():
-    return "Clara está ativa! 👋"
+def home():
+    return "Clara está online!", 200
 
 @app.route("/", methods=["POST"])
-def responder():
-    data = request.get_json()
-    
+def receber_mensagem():
     try:
-        mensagem = data["message"]["text"]
-        resposta = gerar_resposta(mensagem)
-        return jsonify({"resposta": resposta})
-    except Exception as e:
-        return jsonify({"erro": str(e)}), 400
+        dados = request.get_json()
+        texto_usuario = dados["message"]["text"]
+        numero = dados["phone"]
 
-def gerar_resposta(mensagem):
-    response = openai.ChatCompletion.create(
-        model="gpt-3.5-turbo",
-        messages=[
-            {"role": "system", "content": "Você é uma atendente virtual chamada Clara, educada, acolhedora e inteligente. Seja breve, simpática e clara."},
-            {"role": "user", "content": mensagem}
-        ]
-    )
-    return response.choices[0].message["content"]
+        print(f"Mensagem recebida de {numero}: {texto_usuario}")
+
+        resposta = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "Você é a Clara, uma atendente virtual empática e inteligente da CentralPsi. Responda com leveza, gentileza e clareza."},
+                {"role": "user", "content": texto_usuario}
+            ]
+        )
+
+        mensagem_resposta = resposta.choices[0].message["content"].strip()
+
+        return jsonify({
+            "replier": {
+                "message": {
+                    "text": mensagem_resposta,
+                    "type": "chat"
+                }
+            }
+        }), 200
+
+    except Exception as e:
+        print(f"Erro: {str(e)}")
+        return jsonify({"error": "Erro ao processar a mensagem."}), 500
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=10000)
