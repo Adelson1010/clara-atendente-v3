@@ -21,7 +21,6 @@ def responder():
 
         print(f"Mensagem recebida de {telefone}: {mensagem}")
 
-        # Enviar a pergunta para o ChatGPT
         resposta = openai.ChatCompletion.create(
             model="gpt-3.5-turbo",
             messages=[
@@ -32,7 +31,6 @@ def responder():
 
         texto_resposta = resposta["choices"][0]["message"]["content"]
 
-        # Enviar a resposta via Z-API
         payload = {
             "phone": telefone,
             "message": texto_resposta
@@ -44,4 +42,5 @@ def responder():
     return "OK", 200
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(debug=False, host="0.0.0.0", port=port)
