@@ -1,58 +1,61 @@
 from flask import Flask, request, jsonify
-import openai
 import os
+import openai
+import requests
 
 app = Flask(__name__)
 
-# Chave da API da OpenAI (vinda das variáveis de ambiente)
+# Pegando a chave da OpenAI do ambiente
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
-@app.route("/", methods=["GET"])
-def home():
-    return "Clara está ativa!"
+# Dados da Z-API
+ZAPI_INSTANCE_ID = "3E205CFA4533E06D42D3C6E882E8CF29"
+ZAPI_TOKEN = "23517734C6D44D8122B05660"
+ZAPI_URL = f"https://api.z-api.io/instances/{ZAPI_INSTANCE_ID}/token/{ZAPI_TOKEN}/send-messages"
 
 @app.route("/", methods=["POST"])
-def receber_mensagem():
+def whatsapp_webhook():
+    data = request.json
+
     try:
-        data = request.get_json()
+        # Pegando o número e a mensagem recebida
+        message = data['message']
+        number = data['phone']
 
-        mensagem = data.get("message", {}).get("text", "")
-        telefone = data.get("phone", "")
+        # Ignorar mensagens vazias
+        if not message:
+            return jsonify({"status": "mensagem vazia"}), 200
 
-        if not mensagem or not telefone:
-            return jsonify({"status": "erro", "detalhe": "mensagem ou telefone ausente"}), 400
+        # Cria a resposta com a OpenAI
+        resposta = gerar_resposta_clara(message)
 
-        resposta = gerar_resposta(mensagem)
+        # Envia a resposta de volta pelo WhatsApp
+        payload = {
+            "phone": number,
+            "message": resposta
+        }
 
-        enviar_resposta(telefone, resposta)
+        headers = {"Content-Type": "application/json"}
+        requests.post(ZAPI_URL, json=payload, headers=headers)
 
-        return jsonify({"status": "sucesso", "mensagem": "resposta enviada"})
-    
+        return jsonify({"status": "mensagem recebida e respondida"}), 200
+
     except Exception as e:
-        return jsonify({"status": "erro", "detalhe": str(e)}), 500
+        return jsonify({"erro": str(e)}), 500
 
-def gerar_resposta(pergunta):
+def gerar_resposta_clara(pergunta):
+    prompt = f"Você é Clara, uma atendente virtual simpática e objetiva. Responda de forma clara: {pergunta}"
+
     resposta = openai.ChatCompletion.create(
         model="gpt-3.5-turbo",
         messages=[
-            {"role": "system", "content": "Você é Clara, uma atendente virtual simpática e eficiente da CentralPsi. Responda com leveza e clareza."},
+            {"role": "system", "content": "Você é uma assistente chamada Clara."},
             {"role": "user", "content": pergunta}
-        ]
+        ],
+        temperature=0.7
     )
-    return resposta.choices[0].message["content"]
 
-def enviar_resposta(telefone, mensagem):
-    import requests
-    url = "https://api.z-api.io/instances/3E205CFA4533E06D42D3C6E882E8CF29/token/23517734C6D44D8122B05660/send-messages"
-    payload = {
-        "phone": telefone,
-        "message": {
-            "text": mensagem,
-            "type": "chat"
-        }
-    }
-    headers = {"Content-Type": "application/json"}
-    requests.post(url, json=payload, headers=headers)
+    return resposta.choices[0].message["content"].strip()
 
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0")
+    app.run(host="0.0.0.0", port=5000)
